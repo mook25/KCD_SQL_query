@@ -1,0 +1,28 @@
+/* 오가닉 유입 분석 _ 첫유입자 기준 */
+select * from (
+select distinct 
+    cashnote.signed_up.user_id AS 가입USERID,
+    cashnote.credential_added.user_id AS 여신인증USERID,
+    cashnote.pages.user_id AS 페이지USERID,
+    cashnote.pages.sent_at AS 페이지방문일자,
+    cashnote.signed_up.sent_at AS 가입일자,
+    cashnote.credential_added.sent_at AS 여신인증일자,
+    cashnote.signed_up.context_page_referrer AS SIGNUP리퍼러,
+    cashnote.credential_added.context_page_referrer AS CREFIA리퍼러,
+    cashnote.pages.context_page_referrer AS PAGE리퍼러,
+    cashnote.pages.anonymous_id AS 페이지익명ID,
+    cashnote.signed_up.anonymous_id AS 가입익명ID,
+    cashnote.credential_added.anonymous_id AS 여신인증익명ID,
+    cashnote.credential_added.type AS 연동타입,
+    row_number() over (partition by cashnote.credential_added.user_id order by cashnote.pages.sent_at) as rn
+
+FROM
+    cashnote.signed_up
+JOIN cashnote.credential_added ON cashnote.signed_up.user_id = cashnote.credential_added.user_id
+JOIN cashnote.pages ON cashnote.signed_up.anonymous_id = cashnote.pages.anonymous_id
+WHERE
+    cashnote.credential_added.sent_at BETWEEN '2018-10-01'
+AND '2018-10-22'
+AND cashnote.credential_added."type" = 'crefia'
+AND cashnote.pages.sent_at < cashnote.signed_up.sent_at
+AND cashnote.pages.sent_at < cashnote.credential_added.sent_at) t WHERE rn = 1;
