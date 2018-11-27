@@ -1,0 +1,98 @@
+/*Type of credentials  /  Status of credentials*/
+status -> 1:스크래핑 완료 / 2:스크래핑 실패 / 3:스크래핑 중
+Credentials::HometaxCertificate
+Credentials::BankAccount
+Credentials::CreditCard
+Credentials::CrefiaBusiness
+Credentials::Crefia
+Credentials::HometaxLogin 
+
+
+/*여신인증유도 adhoc 전환유저 쿼리*/
+SELECT b.owner_id as 유저아이디, c.business_id as 비즈니스아이디, c.status as 스크래핑현황, r.text
+FROM credentials c 
+JOIN report_logs r ON c.business_id = r.business_id
+JOIN businesses b ON c.business_id = b.id
+WHERE report_type = '여신협등록유도adhoc_181029'
+AND c."type" = 'Credentials::CrefiaBusiness'
+AND c.status != 2
+AND c.created_at >= '2018-09-29';
+
+
+/* 활성사업자 확보 adhoc 플러스친구_차단유저_lms_adhoc_181112 대상자 조회 쿼리 */
+select count(distinct b.id) AS "크레덴셜 연동 했으나, 현재 카톡블락한 사업자" from businesses b
+join users u on u.id = b.owner_id
+join autoreply_friends a on a.user_id = u.id
+join credentials c on c.business_id = b.id
+and a.blocked = true
+and ((c.type = 'Credentials::Crefia' and c.status != 2) or (c.type = 'Credentials::CrefiaBusiness' and c.status != 2) or (c.type = 'Credentials::HometaxLogin' and c.status != 2) or (c.type = 'Credentials::HometaxCertificate' and c.status != 2));*/;
+
+
+/* 홈택스 등록 유도 _ 홈택스등록유도adhoc_181107 전환유저 조회 쿼리 */
+SELECT b.owner_id as 유저아이디, r.report_type, c.created_at, r.text
+FROM credentials c 
+JOIN report_logs r ON c.business_id = r.business_id
+JOIN businesses b ON c.business_id = b.id
+JOIN autoreply_friends a ON b.owner_id =a.user_id
+WHERE report_type like '홈택스등록유도adhoc_181107'
+AND c."type" like 'Credentials::Hometax%'
+AND c.status != 2
+AND c.created_at between '2018-11-06 16:00' and '2018-11-10'
+ORDER BY c.created_at desc;
+
+
+/* 플친추가 유도 _ 플러스친구_차단유저_lms_adhoc_181112 조회 쿼리 */
+SELECT b.owner_id as 유저아이디, r.report_type, c.created_at, r.text
+FROM credentials c 
+JOIN report_logs r ON c.business_id = r.business_id;
+JOIN businesses b ON c.business_id = b.id
+JOIN autoreply_friends a ON b.owner_id =a.user_id
+WHERE report_type like '플러스친구_차단유저_lms_adhoc_181112'
+AND c."type" like 'Credentials::Hometax%'
+AND c.status != 2
+AND c.created_at >='2018-11-12'
+ORDER BY c.created_at desc;
+
+
+/* 추천간소화 유도 _ 추천제도활성화 adhoc, 인바이트를 받아서 여신한사람을 뽑은 다음에 인바이트 한 사람 userid 조회쿼리*/
+select i.inviter_id, i.invitee_id, c.business_id, b.id
+FROM (select * from invitations where created_at between '2018-10-25' and '2018-10-31') as i
+LEFT JOIN report_logs r ON r.user_id = i.inviter_id
+LEFT JOIN credentials c ON r.business_id = c.business_id
+LEFT JOIN businesses b ON r.user_id = b.owner_id
+WHERE report_type = '추천제도활성화 adhoc'
+AND c."type" like 'Credentials::Crefia%'
+AND c.status != 2;
+
+
+ㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡ
+/* 드립캠페인 A/B테스트 조회 쿼리 _ 단일캠페인 */
+select variant, count(*), count(*) filter (where c.id is not null)
+from ab_participations ab
+join businesses b on b.owner_id = ab.subject_id::integer
+left outer join credentials c on c.business_id = b.id and c.type like 'Credentials::Crefia%'
+where experiment = 'crefia_1st_180917' group by 1;
+
+/* 드립캠페인 A/B테스트 조회 쿼리 _ 다중캠페인 */
+SELECT 
+  T.experiment,
+	T.variant,
+	COUNT ( T.ID ) AS messages,
+	COUNT ( T.ID ) FILTER ( WHERE C.ID IS NOT NULL ) AS credential_added 
+FROM
+	(
+	SELECT
+		ab.*,
+		b.ID AS business_id 
+	FROM
+		ab_participations AS ab
+		INNER JOIN ( SELECT DISTINCT ON ( owner_id ) owner_id, ID FROM businesses ) AS b ON CAST ( ab.subject_id AS INTEGER ) = b.owner_id 
+	)
+	AS T LEFT OUTER JOIN ( SELECT ID, TYPE, created_at, updated_at, business_id, status FROM credentials WHERE TYPE LIKE'%Crefia%' ) AS C ON T.business_id = C.business_id 
+GROUP BY
+	T.experiment,
+	T.variant;
+
+
+
+
