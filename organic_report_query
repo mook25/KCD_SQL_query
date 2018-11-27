@@ -7,15 +7,11 @@ select distinct
     cashnote.pages.sent_at AS 페이지방문일자,
     cashnote.signed_up.sent_at AS 가입일자,
     cashnote.credential_added.sent_at AS 여신인증일자,
-    cashnote.signed_up.context_page_referrer AS SIGNUP리퍼러,
-    cashnote.credential_added.context_page_referrer AS CREFIA리퍼러,
+		row_number() over (partition by cashnote.credential_added.user_id order by cashnote.pages.sent_at) as rn,
     cashnote.pages.context_page_referrer AS PAGE리퍼러,
-    cashnote.pages.anonymous_id AS 페이지익명ID,
-    cashnote.signed_up.anonymous_id AS 가입익명ID,
-    cashnote.credential_added.anonymous_id AS 여신인증익명ID,
-    cashnote.credential_added.type AS 연동타입,
-    row_number() over (partition by cashnote.credential_added.user_id order by cashnote.pages.sent_at) as rn
-
+		cashnote.signed_up.context_page_referrer AS SIGNUP리퍼러,
+    cashnote.credential_added.context_page_referrer AS CREFIA리퍼러,
+    cashnote.credential_added.type AS 연동타입
 FROM
     cashnote.signed_up
 JOIN cashnote.credential_added ON cashnote.signed_up.user_id = cashnote.credential_added.user_id
